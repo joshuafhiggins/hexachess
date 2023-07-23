@@ -6,11 +6,13 @@ use bevy::prelude::*;
 use bevy::render::mesh::Indices;
 use bevy::render::render_resource::PrimitiveTopology;
 use bevy::window::PrimaryWindow;
+use chess::ChessTile;
 use hexx::shapes;
 use hexx::*;
 
 /// World size of the hexagons (outer radius)
 const HEX_SIZE: Vec2 = Vec2::splat(20.0);
+const BOARD_SIZE: u32 = 6;
 
 pub fn main() {
     App::new()
@@ -22,7 +24,7 @@ pub fn main() {
             ..default()
         }))
         .add_systems(Startup, (setup_camera, setup_grid))
-        .add_systems(Update, handle_input)
+        .add_systems(Update, (handle_input, color_board))
         .run();
 }
 
@@ -74,7 +76,7 @@ fn setup_grid(
     let mesh = hexagonal_plane(&layout);
     let mesh_handle = meshes.add(mesh);
 
-    let entities = shapes::hexagon(hex(0, 0), 6)
+    let entities = shapes::hexagon(hex(0, 0), BOARD_SIZE - 1)
         .map(|hex| {
             let pos = layout.hex_to_world_pos(hex);
             let id = commands
@@ -99,8 +101,33 @@ fn setup_grid(
     });
 }
 
-fn color_board(mut commands: Commands, map: Res<Map>,) {
-    //Make Grey
+fn color_board(mut commands: Commands, mut map: ResMut<Map>,) {
+    for tile in &map.entities {
+        let tile = tile.0;
+        let entity = map.entities.get(&tile).copied().unwrap();
+
+        for i in -(BOARD_SIZE as i32) /2 ..= (BOARD_SIZE as i32) /2 {
+            if tile.y == tile.x + grey_offset(i) {
+                commands.entity(entity).insert(map.grey_material.clone());
+            } else if tile.y == tile.x + black_offset(i) {
+                commands.entity(entity).insert(map.black_material.clone());
+            } else if tile.y == tile.x + white_offset(i) {
+                commands.entity(entity).insert(map.white_material.clone());
+            }
+        } 
+    }
+}
+
+fn white_offset(i: i32) -> i32 {
+    (3 * i) + 1
+}
+
+fn grey_offset(i: i32) -> i32 {
+    (3 * i) + 0
+}
+
+fn black_offset(i: i32) -> i32 {
+    (-1 * 3 * i) - 1
 }
 
 /// Input interaction
@@ -115,10 +142,10 @@ fn handle_input(
     if let Some(pos) = window.cursor_position() {
         let pos = Vec2::new(pos.x - window.width() / 2.0, window.height() / 2.0 - pos.y);
         let coord = map.layout.world_pos_to_hex(pos);
-        if mouse_buttons.just_pressed(MouseButton::Left) {
-            println!("{}, {}", coord.x, coord.y);
-        }
         if let Some(entity) = map.entities.get(&coord).copied() {
+            if mouse_buttons.just_pressed(MouseButton::Left) {
+                println!("{}, {}", coord.x, coord.y);
+            }
             if coord == highlighted_hexes.selected {
                 return;
             }
