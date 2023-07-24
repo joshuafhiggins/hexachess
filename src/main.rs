@@ -6,7 +6,8 @@ use bevy::prelude::*;
 use bevy::render::mesh::Indices;
 use bevy::render::render_resource::PrimitiveTopology;
 use bevy::window::PrimaryWindow;
-use chess::ChessTile;
+
+use chess::{ChessTile, TileColor, Occupation};
 use hexx::shapes;
 use hexx::*;
 
@@ -24,20 +25,14 @@ pub fn main() {
             ..default()
         }))
         .add_systems(Startup, (setup_camera, setup_grid))
-        .add_systems(Update, (handle_input, color_board))
+        .add_systems(PostStartup, color_board)
+        .add_systems(Update, handle_input)
         .run();
 }
 
 #[derive(Debug, Default, Resource)]
 struct HighlightedHexes {
     pub selected: Hex,
-    pub halfway: Hex,
-    pub ring: Vec<Hex>,
-    pub wedge: Vec<Hex>,
-    pub dir_wedge: Vec<Hex>,
-    pub line: Vec<Hex>,
-    pub half_ring: Vec<Hex>,
-    pub rotated: Vec<Hex>,
 }
 
 #[derive(Debug, Resource)]
@@ -101,7 +96,7 @@ fn setup_grid(
     });
 }
 
-fn color_board(mut commands: Commands, mut map: ResMut<Map>,) {
+fn color_board(mut commands: Commands, map: Res<Map>,) {
     for tile in &map.entities {
         let tile = tile.0;
         let entity = map.entities.get(&tile).copied().unwrap();
@@ -109,10 +104,13 @@ fn color_board(mut commands: Commands, mut map: ResMut<Map>,) {
         for i in -(BOARD_SIZE as i32) /2 ..= (BOARD_SIZE as i32) /2 {
             if tile.y == tile.x + grey_offset(i) {
                 commands.entity(entity).insert(map.grey_material.clone());
+                commands.entity(entity).insert(ChessTile::new(TileColor::GREY, Occupation::NONE));
             } else if tile.y == tile.x + black_offset(i) {
                 commands.entity(entity).insert(map.black_material.clone());
+                commands.entity(entity).insert(ChessTile::new(TileColor::BLACK, Occupation::NONE));
             } else if tile.y == tile.x + white_offset(i) {
                 commands.entity(entity).insert(map.white_material.clone());
+                commands.entity(entity).insert(ChessTile::new(TileColor::WHITE, Occupation::NONE));
             }
         } 
     }
@@ -127,7 +125,7 @@ fn grey_offset(i: i32) -> i32 {
 }
 
 fn black_offset(i: i32) -> i32 {
-    (-1 * 3 * i) - 1
+    (3 * i) - 1
 }
 
 /// Input interaction
@@ -146,29 +144,9 @@ fn handle_input(
             if mouse_buttons.just_pressed(MouseButton::Left) {
                 println!("{}, {}", coord.x, coord.y);
             }
-            if coord == highlighted_hexes.selected {
-                return;
-            }
-            // Clear highlighted hexes materials
-            for vec in [
-                &highlighted_hexes.ring,
-                &highlighted_hexes.line,
-                &highlighted_hexes.wedge,
-                &highlighted_hexes.dir_wedge,
-                &highlighted_hexes.half_ring,
-                &highlighted_hexes.rotated,
-            ] {
-                for entity in vec.iter().filter_map(|h| map.entities.get(h)) {
-                    commands
-                        .entity(*entity)
-                        .insert(map.white_material.clone());
-                }
-            }
+
             commands
                 .entity(map.entities[&highlighted_hexes.selected])
-                .insert(map.white_material.clone());
-            commands
-                .entity(map.entities[&highlighted_hexes.halfway])
                 .insert(map.white_material.clone());
             
             // Make the origin orange

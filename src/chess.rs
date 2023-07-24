@@ -1,9 +1,15 @@
-use bevy::prelude::Component;
+use bevy::{prelude::Component, render::color};
 
 #[derive(Component)]
 pub struct ChessTile {
     color: TileColor,
     piece: Occupation,
+}
+
+impl ChessTile {
+    pub fn new(color: TileColor, piece: Occupation) -> ChessTile {
+        ChessTile { color: color, piece: piece }
+    }
 }
 
 pub enum TileColor {
@@ -24,5 +30,5 @@ pub enum Occupation {
     ROOK(Team),
     QUEEN(Team),
     KING(Team),
-    None,
+    NONE,
 }
