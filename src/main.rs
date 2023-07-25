@@ -33,6 +33,8 @@ pub fn main() {
 #[derive(Debug, Default, Resource)]
 struct HighlightedHexes {
     pub selected: Hex,
+    pub last_selected: Hex,
+    pub selected_entity: Option<Entity>,
 }
 
 #[derive(Debug, Resource)]
@@ -131,6 +133,7 @@ fn black_offset(i: i32) -> i32 {
 /// Input interaction
 fn handle_input(
     mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
     windows: Query<&Window, With<PrimaryWindow>>,
     mouse_buttons: Res<Input<MouseButton>>,
     map: Res<Map>,
@@ -140,24 +143,34 @@ fn handle_input(
     if let Some(pos) = window.cursor_position() {
         let pos = Vec2::new(pos.x - window.width() / 2.0, window.height() / 2.0 - pos.y);
         let coord = map.layout.world_pos_to_hex(pos);
-        if let Some(entity) = map.entities.get(&coord).copied() {
+        if let Some(_) = map.entities.get(&coord).copied() {
             if mouse_buttons.just_pressed(MouseButton::Left) {
                 println!("{}, {}", coord.x, coord.y);
             }
 
-            commands
-                .entity(map.entities[&highlighted_hexes.selected])
-                .insert(map.white_material.clone());
-            
-            // Make the origin orange
-            commands
-                .entity(map.entities[&Hex::new(0, 0)])
-                .insert(map.origin_material.clone());
-            // Make the selected tile red
-            commands
-                .entity(entity)
-                .insert(map.selected_material.clone());
+
+            let pos = map.layout.hex_to_world_pos(coord);
+            let mesh = hexagonal_plane(&map.layout);
+            let mesh_handle = meshes.add(mesh);
+
             highlighted_hexes.selected = coord;
+
+            if highlighted_hexes.selected.as_ivec2() != highlighted_hexes.last_selected.as_ivec2() {
+                if let Some(selected_entity) = highlighted_hexes.selected_entity {
+                    commands.entity(selected_entity).despawn();
+
+                }
+                highlighted_hexes.selected_entity = Some(commands
+                    .spawn(ColorMesh2dBundle {
+                        transform: Transform::from_xyz(pos.x, pos.y, 1.0).with_scale(Vec3::splat(0.9)),
+                        mesh: mesh_handle.clone().into(),
+                        material: map.selected_material.clone(),
+                        ..default()
+                    })
+                    .id());
+            }
+
+            highlighted_hexes.last_selected = coord;
         }
     }
 }
